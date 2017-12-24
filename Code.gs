@@ -1,7 +1,11 @@
 var botId = "insert bot id here";
-var database = new DataMap('insert spreadsheet link here');
+var database = new DataMap("insert spreadsheet link here");
 
 function sendText(text){
+  if (text.length > 999) {
+    text = text.substring(0,995) + "...";
+  }
+  
   var payload = {
     "bot_id" : botId,
     "text" : text
@@ -14,6 +18,25 @@ function sendText(text){
   UrlFetchApp.fetch("https://api.groupme.com/v3/bots/post", options);
 }
 
+function sendImage(url, caption) {
+  var payload = {
+    "bot_id" : botId,
+    "text" : caption,
+    "attachments" : [
+      {
+        "type" : "image",
+        "url" : url
+      }
+    ]
+  };
+  var options = {
+    "method" : "post",
+    "payload" : JSON.stringify(payload)
+  };
+
+  UrlFetchApp.fetch("https://api.groupme.com/v3/bots/post", options);
+}
+
 //respond to messages sent to the group. Recieved as POST
 //this method is automatically called whenever the Web App's (to be) URL is called
 function doPost(e){
@@ -23,6 +46,16 @@ function doPost(e){
   var id = post.id;
   var sender_id = post.sender_id;
   var user_id = post.user_id;
+  var group_id = post.group_id;
+  
+  if (group_id == <insert group ID 1 here>) {
+    botId = "insert bot id here for the corresponding group 1";
+  }
+  
+  if (group_id == <insert group ID 2 here>) {
+    botId = "insert bot id here for the corresponding group 2";
+  }
+  
   Logger.log(text + '-' + name + '-'  + id + '-'  + sender_id + '-'  + user_id);
   //sendText(text + '-' + name + '-'  + id + '-'  + sender_id + '-'  + user_id);
   
@@ -41,6 +74,10 @@ function doPost(e){
     msg += '!cal - Display calendar events for 2 weeks\n';
     msg += '!bylaws - Display link to Chapter Bylaws\n';
     msg += '!constitution - Display link to Chapter Constitution\n';
+    msg += '!counselordoc - Display link to MBC counselor documentation\n';
+    msg += '!translate [text] - Translate text to English\n';
+    msg += '!spanish [text] - Translate text to Spanish\n';
+    msg += '!define [term] - Define the term from Urban Dictionary\n';
     msg += '!help - Displays this message\n';
     sendText(msg);
   }
@@ -93,16 +130,32 @@ function doPost(e){
     sendText(msg);
   }
   
+  if (text.toLowerCase().indexOf("!translate") == 0) {
+    var msg = translateToEnglish(text.substring(11));
+    sendText(msg);
+  }
+  
+  if (text.toLowerCase().indexOf("!spanish") == 0) {
+    var msg = translateToSpanish(text.substring(9));
+    sendText(msg);
+  }
+  
+  if (text.toLowerCase().indexOf("!define") == 0){
+    var result = getDefinition(text.substring(8));
+    var msg = result.definition + "\n" + result.link;
+    sendText(msg);
+  }
+  
   if (text.toLowerCase().indexOf("!bylaws") == 0) {
-    sendText("insert link here");
+    sendText("<https link>");
   }
   
   if (text.toLowerCase().indexOf("!constitution") == 0) {
-    sendText("insert link here");
+    sendText("<https link>");
   }
   
-  if (text.indexOf("oversight") != -1) {
-    sendText("Cole oversees Chris in MBC but Chris oversees Cole in Eagle Mentors. So, who is in charge?");
+  if (text.toLowerCase().indexOf("!counselordoc") == 0) {
+    sendText("<https link>");
   }
   
   if (text.toLowerCase().indexOf("mein") != -1) {
@@ -171,6 +224,34 @@ function addKarma(name) {
 
 function createPerson(name, karma, tag) {
   database.sheet.appendRow([name, karma, tag]);
+}
+
+function translateToSpanish(text) {
+  var msg = LanguageApp.translate(text, '', 'es');
+  return msg;
+}
+
+function translateToEnglish(text) {
+  var msg = LanguageApp.translate(text, '', 'en');
+  return msg;
+}
+
+function getDefinition(term) {
+  var definition = "No definition found.";
+  var link = "";
+  //term = term.replace(/\s/,"+");
+  var url = "http://api.urbandictionary.com/v0/define?term=" + term;
+  //Logger.log(url);
+  var response = UrlFetchApp.fetch(url);
+  //Logger.log(response.getContentText());
+  var jsonResponse = JSON.parse(response);
+  if (jsonResponse.result_type !== "no_results") {
+    definition = jsonResponse.list[0].definition;
+    link = jsonResponse.list[0].permalink;
+  }
+  //Logger.log(definition);
+  //Logger.log(link);
+  return {definition : definition, link : link};
 }
 
 function databaseGetSize() {
