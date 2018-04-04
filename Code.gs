@@ -1,5 +1,29 @@
-var botId = "insert bot id here";
-var database = new DataMap("insert spreadsheet link here");
+// Initialize Google Spreadsheet with data, commands, messages, and stats
+var spreadsheetURL = '<insert spreadsheet URL here>';
+var spreadsheet = SpreadsheetApp.openByUrl(spreadsheetURL);
+
+// Main group info
+var mainBotName = "<Insert main group bot name here>";
+var mainGroupID = <Insert main group ID here>;
+var mainBotID = "<Insert main group bot ID here>";
+
+// Test group info
+var testBotName = "<Insert test group bot name here>";
+var testGroupID = <Insert test group ID here>;
+var testBotID = "<Insert test group bot ID here>"
+
+// User token access key required to retrieve more powerful APIs from GroupMe
+var tokenID = "<Insert user access token provided by GroupMe here>";
+
+// Initialize variables
+var botId = mainBotID;
+var botName = mainBotName;
+
+// Initialize each sheet in workbook
+var database = new getData();
+var commandList = new getCommands();
+var messageList = new getMessages();
+var messageStats = new getMessageStats();
 
 function sendText(text){
   if (text.length > 999) {
@@ -18,7 +42,7 @@ function sendText(text){
   UrlFetchApp.fetch("https://api.groupme.com/v3/bots/post", options);
 }
 
-function sendImage(url, caption) {
+function sendImage(caption, url) {
   var payload = {
     "bot_id" : botId,
     "text" : caption,
@@ -37,6 +61,26 @@ function sendImage(url, caption) {
   UrlFetchApp.fetch("https://api.groupme.com/v3/bots/post", options);
 }
 
+function sendVideo(text, url, previewUrl) {
+  var payload = {
+    "bot_id" : botId,
+    "text" : text,
+    "attachments" : [
+      {
+        "type" : "video",
+        "preview_url" : previewUrl,
+        "url" : url
+      }
+    ]
+  };
+  var options = {
+    "method" : "post",
+    "payload" : JSON.stringify(payload),
+  };
+  
+  UrlFetchApp.fetch("https://api.groupme.com/v3/bots/post", options);
+}
+
 //respond to messages sent to the group. Recieved as POST
 //this method is automatically called whenever the Web App's (to be) URL is called
 function doPost(e){
@@ -48,26 +92,31 @@ function doPost(e){
   var user_id = post.user_id;
   var group_id = post.group_id;
   
-  if (group_id == <insert group ID 1 here>) {
-    botId = "insert bot id here for the corresponding group 1";
+  // Change which bot replies depending on the group where the message was sent
+  if (group_id == mainGroupID) {
+    botId = mainBotID;
+    botName = mainBotName;
+  } 
+  if (group_id == testGroupID) {
+    botId = testBotID;
+    botName = testBotName;
   }
   
-  if (group_id == <insert group ID 2 here>) {
-    botId = "insert bot id here for the corresponding group 2";
-  }
-  
-  Logger.log(text + '-' + name + '-'  + id + '-'  + sender_id + '-'  + user_id);
-  //sendText(text + '-' + name + '-'  + id + '-'  + sender_id + '-'  + user_id);
-  
+  //Logger.log(text + '-' + name + '-'  + id + '-'  + sender_id + '-'  + user_id);
+    
   if(text.toLowerCase().substring(0, 3) == "!hi"){
     sendText("Hello, " + name);
+  }
+  
+  if (text.toLowerCase().indexOf(" added ") != -1 && user_id == "system") {
+    var names = text.substring(text.toLowerCase().indexOf("added") +6, text.toLowerCase().indexOf("to the group") - 1);
+    sendText("Welcome " + names + "!");
   }
   
   if (text.toLowerCase().indexOf("!help") == 0) {
     var msg = 'Commands:\n';
     msg+= '!karma - Display karma of caller\n';
-    msg += '[Person]++ - Gives [Person] karma\n';
-    msg += '!karma all - Display karma of all in database\n';
+    msg += '!karma all [ratio]- Display karma of all in database\n';
     msg += '!tag - Display tag of caller\n';
     msg += '!tagset [message] - Sets the tag of the caller with the message\n';
     msg += '!tag all - Display tag of all in database\n';
@@ -84,21 +133,33 @@ function doPost(e){
   
   if (text.toLowerCase().indexOf("!karma all") == 0) {
     var karmaArray = [];
-    for (var x = 0; x < databaseGetSize(); x++) {
-      karmaArray.push({name: database.values[x][0], karma: database.values[x][1]});
+    for (var x = 1; x < messageStats.size; x++) {
+      if (messageStats.values[x][0].toString().match(/^[0-9]+$/) != null) {
+        karmaArray.push({name: messageStats.values[x][1], karma: messageStats.values[x][4], ratio: messageStats.values[x][5].toPrecision(3)});
+      }
     }
     
-    karmaArray.sort(function(a,b) {
-      return b.karma - a.karma
-    });
-    
-    var msg = "";
+    if (text.toLowerCase().indexOf("ratio") != -1) {
+      karmaArray.sort(function(a,b) {
+        return b.ratio - a.ratio
+      });
+    } else if (text.toLowerCase().indexOf("low") != -1) {
+      karmaArray.sort(function(a,b) {
+        return a.ratio - b.ratio
+      });
+    } else {
+      karmaArray.sort(function(a,b) {
+        return b.karma - a.karma
+      });
+    }
+        
+    var msg = "Name: Likes (Ratio)\n";
     for (var x = 0; x < karmaArray.length; x++) {
-      msg += karmaArray[x].name + ": " + karmaArray[x].karma + "\n";
+      msg += karmaArray[x].name + ": " + karmaArray[x].karma + " (" + karmaArray[x].ratio + ")"+ "\n";
     }
     sendText(msg);
   } else  if (text.indexOf("!karma") == 0) {
-    var karma = getKarma(name);
+    var karma = getKarma(user_id);
     sendText(name + ": " + karma);
   }
   
@@ -115,18 +176,18 @@ function doPost(e){
     var msg = getTag(name);
     sendText(name + ": " + msg);
   }
-  
-  if (text.indexOf("++") != -1 && text.indexOf("++") < 30) {
-    var karmaRecipient = text.substring(0, text.indexOf("++"));
-    addKarma(karmaRecipient);
-  }
-  
+    
   if (text.toLowerCase().indexOf("!cal") == 0) {
     var events = listUpcomingEvents();
     var msg = "Events in the next 2 weeks:\n";
     for (var x = 0; x < events.length; x++) {
       msg += events[x].title + " - " + events[x].time.toLocaleString() + "\n";
     }
+    sendText(msg);
+  }
+  
+  if (text.toLowerCase().indexOf("!swipe") == 0) {
+    var msg = name + " is a poor college student and wants to be swiped into Scott!";
     sendText(msg);
   }
   
@@ -146,26 +207,64 @@ function doPost(e){
     sendText(msg);
   }
   
-  if (text.toLowerCase().indexOf("!bylaws") == 0) {
-    sendText("<https link>");
+  if (text.indexOf("//") == 0 && name.indexOf(botName) != 0) {
+    sendText("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
   }
   
-  if (text.toLowerCase().indexOf("!constitution") == 0) {
-    sendText("<https link>");
+  if (text.toLowerCase().indexOf("!add") == 0 && name.indexOf("Jonathan Liew") == 0) {
+    var addCommand = text.substring(5);
+    commandList.sheet.appendRow(addCommand.split(','));
   }
   
-  if (text.toLowerCase().indexOf("!counselordoc") == 0) {
-    sendText("<https link>");
+  // Loop through the command list searching for a match  
+  for (var x = 0; x < commandList.size; x++) {
+    // If matched with command and the bot did not send the message, reply according to message format (Text, Image, or Video)
+    if (text.toLowerCase().indexOf(commandList.values[x][0]) != -1 && name.indexOf(botName) != 0) {
+      if (commandList.values[x][1].indexOf("Text") == 0) {
+        sendText(commandList.values[x][2].toString());
+      }
+      else if (commandList.values[x][1].indexOf("Image") == 0) {
+        sendImage(commandList.values[x][2].toString(),commandList.values[x][3].toString());
+      }
+      else if (commandList.values[x][1].indexOf("Video") == 0) {
+        sendVideo(commandList.values[x][2].toString(),commandList.values[x][4].toString(),commandList.values[x][5].toString());
+      }
+      
+    }
   }
   
-  if (text.toLowerCase().indexOf("mein") != -1) {
-    sendText("kampf");
+  // If message sent by anyone other than the bot, update the list of messages
+  if (name.indexOf(botName) != 0) {
+    updateMessages();
   }
+}
+
+function updateMessages() {
+
+  var groupID = mainGroupID;
+  var limit = 20;
   
-  if (text.indexOf("!delete") == 0) {
-    sendText("Are you trying to delete me? Delete yourself!");
+  var url = "https://api.groupme.com/v3/groups/" + groupID + "/messages?token=" + tokenID + "&limit=" + limit;
+  var result = UrlFetchApp.fetch(url);
+  var data = JSON.parse(result.getContentText());
+  
+  var messages = data.response.messages;
+  for (i = messages.length - 1; i >= 0; i--) {
+    for (j = messageList.size - limit; j < messageList.size; j++) {
+      // If message exists
+      if (messages[i].id == messageList.values[j][0]) {
+        // If the number of likes needs to be updated, update cell
+        if (messages[i].favorited_by.length != messageList.values[j][5]) {
+          messageList.sheet.getRange(j+1,6).setValue(messages[i].favorited_by.length)
+        }
+        break;
+      }
+      // If message is not found, append to sheet
+      if (j == messageList.size - 1) {
+        messageList.sheet.appendRow([messages[i].id, messages[i].name, messages[i].sender_id, messages[i].created_at, messages[i].text, messages[i].favorited_by.length]);
+      }
+    }    
   }
-  
 }
 
 function sendWeeklyCalendar() {
@@ -179,7 +278,7 @@ function sendWeeklyCalendar() {
 
 function setTag(name, tag) {
   var tagAdded = 0;
-  for (var x = 0; x < databaseGetSize(); x++) {
+  for (var x = 0; x < database.size; x++) {
     if((database.values[x][0] == name)){
       database.sheet.getRange(x+1, 3).setValue(tag);
       tagAdded = 1;
@@ -191,7 +290,7 @@ function setTag(name, tag) {
 }
 
 function getTag(name) {
-  for (var x = 0; x < databaseGetSize(); x++) {
+  for (var x = 0; x < database.size; x++) {
     if((database.values[x][0] == name)){
       return database.values[x][2];
     }
@@ -199,27 +298,13 @@ function getTag(name) {
   return "Tag not found";
 }
 
-function getKarma(name) {
-  for (var x = 0; x < databaseGetSize(); x++) {
-    if((database.values[x][0] == name)){
-      return database.values[x][1];
+function getKarma(user_id) {
+  for (var x = 0; x < messageStats.size; x++) {
+    if((messageStats.values[x][0] == user_id)){
+      return "Likes Recieved/Messages Sent\n" + messageStats.values[x][4] + "/" + messageStats.values[x][2] + "=" + messageStats.values[x][5].toFixed(3);
     }
   }
-  return 0;
-}
-
-function addKarma(name) {
-  var karmaAdded = 0;
-  for (var x = 0; x < databaseGetSize(); x++) {
-    if((database.values[x][0] == name)){
-      currentKarma = database.values[x][1];
-      database.sheet.getRange(x+1, 2).setValue(currentKarma + 1);
-      karmaAdded = 1;
-    }
-  }
-  if (karmaAdded == 0) {
-    createPerson(name, 1, "No tag set");
-  }
+  return "Not Found";
 }
 
 function createPerson(name, karma, tag) {
@@ -254,13 +339,34 @@ function getDefinition(term) {
   return {definition : definition, link : link};
 }
 
-function databaseGetSize() {
-  for(i = 1; i < database.sheet.getMaxRows(); i++){
-      if(database.sheet.getRange(i, 1).getValue() == "" && database.sheet.getRange(i, 2).getValue() == "")
-      {
-        return i - 1;
-      }
-  }
+function getData(){
+  this.sheet = spreadsheet.getSheetByName("Data");
+  this.range = this.sheet.getRange(1, 1, this.sheet.getMaxRows(), 3);
+  this.values = this.range.getValues();
+  this.size = this.sheet.getLastRow();
 }
+
+function getCommands() {
+  this.sheet = spreadsheet.getSheetByName("Commands");
+  this.range = this.sheet.getRange(2, 1, this.sheet.getMaxRows(), 6);
+  this.values = this.range.getValues();
+  this.size = this.sheet.getLastRow();
+}
+
+function getMessages() {
+  this.sheet = spreadsheet.getSheetByName("Messages");
+  this.range = this.sheet.getRange(1, 1, this.sheet.getMaxRows(), 6);
+  this.values = this.range.getValues();
+  this.size = this.sheet.getLastRow(); 
+}
+
+function getMessageStats() {
+  this.sheet = spreadsheet.getSheetByName("Stats");
+  this.range = this.sheet.getRange(1, 1, this.sheet.getMaxRows(), 6);
+  this.values = this.range.getValues();
+  this.size = this.sheet.getLastRow();
+  
+}
+
 
 function doGet() {}
