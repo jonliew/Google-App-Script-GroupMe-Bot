@@ -8,6 +8,7 @@ Parts of this program was taken from https://github.com/william-reed/GroupMe-Bot
 However, it has been heavily modified to fit the needs of this project.
 
 ## Features of the bot
+- Send text or an image with a caption using the bot
 - Tracks, adds, and displays karma for users in the group
 - Sets and displays tag messages for users in the group
 - Display events on a group of Google calendars
@@ -28,5 +29,5 @@ However, it has been heavily modified to fit the needs of this project.
 - [Google Calendar](https://developers.google.com/apps-script/reference/calendar/)
 - [Google Spreadsheet](https://developers.google.com/apps-script/reference/spreadsheet/)
 - [GroupMe Bot Tutorial](https://dev.groupme.com/tutorials/bots)
-- [Google App Script]()
+- [Google App Script](https://developers.google.com/apps-script/)
 - [Google App Script Triggers](https://developers.google.com/apps-script/guides/triggers/installable#managing_triggers_manually)
