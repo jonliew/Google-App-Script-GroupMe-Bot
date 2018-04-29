@@ -9,6 +9,7 @@ However, it has been heavily modified to fit the needs of this project.
 
 ## Features of the bot
 - Send text, image, or video with a caption using the bot
+- Kick mentioned users
 - Tracks and updates number of likes received for users in the group
 - Sets and displays tag messages for users in the group
 - Display events on a group of Google calendars
