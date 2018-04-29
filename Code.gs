@@ -91,6 +91,14 @@ function doPost(e){
   var sender_id = post.sender_id;
   var user_id = post.user_id;
   var group_id = post.group_id;
+  var attachments = post.attachments;
+  
+  var mentionedUserIDs = [];
+  for (i in attachments) {
+    if (attachments[i].type == "mentions") {
+        mentionedUserIDs = attachments[i].user_ids;
+    }
+  }
   
   // Change which bot replies depending on the group where the message was sent
   if (group_id == mainGroupID) {
@@ -108,14 +116,14 @@ function doPost(e){
     sendText("Hello, " + name);
   }
   
-  if (text.toLowerCase().indexOf(" added ") != -1 && user_id == "system") {
+  if (text.toLowerCase().indexOf(" added ") != -1 && name == "GroupMe") {
     var names = text.substring(text.toLowerCase().indexOf("added") +6, text.toLowerCase().indexOf("to the group") - 1);
     sendText("Welcome " + names + "!");
   }
   
   if (text.toLowerCase().indexOf("!help") == 0) {
     var msg = 'Commands:\n';
-    msg+= '!karma - Display karma of caller\n';
+    msg += '!karma - Display karma of caller\n';
     msg += '!karma all [ratio]- Display karma of all in database\n';
     msg += '!tag - Display tag of caller\n';
     msg += '!tagset [message] - Sets the tag of the caller with the message\n';
@@ -127,6 +135,8 @@ function doPost(e){
     msg += '!translate [text] - Translate text to English\n';
     msg += '!spanish [text] - Translate text to Spanish\n';
     msg += '!define [term] - Define the term from Urban Dictionary\n';
+    msg += '!photos - Display a link to our photo albums\n';
+    msg += '!kick [@mention users] - Kick mentioned users\n';
     msg += '!help - Displays this message\n';
     sendText(msg);
   }
@@ -211,9 +221,36 @@ function doPost(e){
     sendText("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
   }
   
-  if (text.toLowerCase().indexOf("!add") == 0 && name.indexOf("Jonathan Liew") == 0) {
+  if (text.toLowerCase().indexOf("!add") == 0 && name == "<Insert your user name here>") {
     var addCommand = text.substring(5);
     commandList.sheet.appendRow(addCommand.split(','));
+  }
+  
+  if (text.toLowerCase().indexOf("!kick") == 0 && name == "<Insert your user name here>") {
+  
+    // Get the list of members in the group and their ids (not user ids) using access token
+    var url = "https://api.groupme.com/v3/groups/" + group_id + "?token=" + tokenID;
+    var result = UrlFetchApp.fetch(url);
+    var data = JSON.parse(result.getContentText());
+    var members = data.response.members;
+    
+    // Loop through all of the mentioned users and kick them
+    for (i in mentionedUserIDs) {
+      
+      var memberID = null;
+      for (j in members) {
+        if (members[j].user_id == mentionedUserIDs[i]) {
+          memberID = members[j].id;
+          break;
+        }
+      }
+      var url = "https://api.groupme.com/v3/groups/" + group_id + "/members/" + memberID + "/remove?token=" + tokenID;
+      var options = {
+        "method" : "post",
+      };
+      var result = UrlFetchApp.fetch(url, options);
+    }
+   
   }
   
   // Loop through the command list searching for a match  
@@ -233,7 +270,7 @@ function doPost(e){
     }
   }
   
-  // If message sent by anyone other than the bot, update the list of messages
+  // If message sent by anyone other than the bot (prevents over calling API), update the list of messages
   if (name.indexOf(botName) != 0) {
     updateMessages();
   }
@@ -249,8 +286,18 @@ function updateMessages() {
   var data = JSON.parse(result.getContentText());
   
   var messages = data.response.messages;
+  
+  if (messages === undefined) {
+    var tempBotID = botID;
+    botID = testBotID;
+    sendText("Help! Something's wrong with me!");
+    sendText(JSON.stringify(data));
+    botId = tempBotID;    
+  }
+  //var messageList = new getMessages();
   for (i = messages.length - 1; i >= 0; i--) {
     for (j = messageList.size - limit; j < messageList.size; j++) {
+
       // If message exists
       if (messages[i].id == messageList.values[j][0]) {
         // If the number of likes needs to be updated, update cell
