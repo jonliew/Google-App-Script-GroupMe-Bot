@@ -266,7 +266,11 @@ function doPost(e){
       msg += "Must mention (@) a user worthy of our shame";
     // shame each mentioned user
     } else {
-      msg += mentionedUserIDs.forEach(setShame);
+      // msg += mentionedUserIDs.forEach(setShame);
+      //mentionedUserIDs.forEach(function(user_id) {
+      //  msg += setShame(user_id);
+      //});
+      msg += setShame(mentionedUserIDs[0]);
     }
 
     sendText(msg);
@@ -415,17 +419,21 @@ function getWallOfShame() {
   }
 
 
-  for (var x = 1; x < shameStats.size; x++) {
+  for (var x = 0; x < shameStats.size; x++) {
     if (shameStats.values[x][0].toString().match(/^[0-9]+$/) != null) {
-      shameArray.push({name: shameStats.values[x][1], shame: shameStats.values[x][2]);
+      shameArray.push({name: shameStats.values[x][1], shame: shameStats.values[x][2]});
     }
   }
 
   // sort array
-  shameArray.sort( (a,b) => b.shame - a.shame );
+  // shameArray.sort( (a,b) => b.shame - a.shame );
+  shameArray.sort(function(a, b) {
+    return b.shame - a.shame;
+  });
 
-  msg += "WALL OF SHAME\n\nName: Shame Count\n";
-  shameArray.forEach(element => {
+
+  msg += "WALL OF SHAME\n\n";
+  shameArray.forEach(function(element) {
     msg += element.name + ": " + element.shame + "\n";
   });
 
@@ -438,23 +446,42 @@ function setShame(user_id) {
   var found = false;
   var x;
   // TODO: probably a better way to check this
+  // find current shame count
   for (x = 0; x < shameStats.size; x++) {
     if((shameStats.values[x][0] == user_id)) {
       found = true;
       break;
     }
   }
+  // find name, from the Stats sheet
+  var idx;
+  var name = null;
+  for (idx = 0; idx < messageStats.size; idx++) {
+    if(messageStats.values[idx][0] == user_id) {
+      name = messageStats.values[idx][1];
+      break;
+    }
+  }
+  // fallback to default
+  if (name == null) {
+    name = "User";
+  }
+
+
   // if shamee is not yet on sheet, add them to it, with a single shame
   if (!found) {
-    shameStats.sheet.appendRow(user_id, "name placeholder", 1);
-    return "User has been shamed. Total shame count: " + 1 + "\n";
+    shameStats.sheet.appendRow([user_id, name, 1]);
+    return name + " has been shamed. Total shame count: " + 1 + "\n";
   // increment shame count otherwise
   } else {
     var shameCount = shameStats.values[x][2] + 1;
-    var cell = shameStats.sheet.getRange(x + 1, 3);
-    cell.setValue(shameCount);
+    var shameCell = shameStats.sheet.getRange(x + 1, 3);
+    shameCell.setValue(shameCount);
 
-    return "User has been shamed. Total shame count: " + count + "\n";
+    var nameCell = shameStats.sheet.getRange(x + 1, 2);
+    nameCell.setValue(name);
+
+    return name + " has been shamed. Total shame count: " + shameCount + "\n";
   }
 }
 
@@ -487,10 +514,10 @@ function getMessageStats() {
 }
 
 
-// Shame sheet has three columns, with headers: shamee id, name, and shame count, in that order
+// Shame sheet has two  columns, with headers: shamee id and shame count, in that order
 function getShameStats() {
   this.sheet = spreadsheet.getSheetByName("Shame");
-  this.range = this.sheet.getRange(2, 1, this.sheet.getMaxRows(), 3);
+  this.range = this.sheet.getRange(1, 1, this.sheet.getMaxRows(), 3);
   this.values = this.range.getValues();
   this.size = this.sheet.getLastRow();
 }
