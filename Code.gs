@@ -24,6 +24,7 @@ var database = new getData();
 var commandList = new getCommands();
 var messageList = new getMessages();
 var messageStats = new getMessageStats();
+var shameStats = new getShameStats();
 
 function sendText(text){
   if (text.length > 999) {
@@ -125,6 +126,8 @@ function doPost(e){
     var msg = 'Commands:\n';
     msg += '!karma - Display karma of caller\n';
     msg += '!karma all [ratio]- Display karma of all in database\n';
+    msg += '!shame [@mention users] - Shame on someone\n';
+    msg += '!shame wall - Display the Wall of Shame\n';
     msg += '!tag - Display tag of caller\n';
     msg += '!tagset [message] - Sets the tag of the caller with the message\n';
     msg += '!tag all - Display tag of all in database\n';
@@ -251,6 +254,22 @@ function doPost(e){
       var result = UrlFetchApp.fetch(url, options);
     }
    
+  }
+
+  if (text.toLowerCase().indexOf("!shame wall") == 0) {
+    var msg = getWallOfShame();
+
+    sendText(msg);
+  } else if (text.toLowerCase().indexOf("!shame") == 0) {
+    var msg = "";
+    if (mentionedUserIDs.length == 0) {
+      msg += "Must mention (@) a user worthy of our shame";
+    // shame each mentioned user
+    } else {
+      msg += mentionedUserIDs.forEach(setShame);
+    }
+
+    sendText(msg);
   }
   
   // Loop through the command list searching for a match  
@@ -386,6 +405,59 @@ function getDefinition(term) {
   return {definition : definition, link : link};
 }
 
+// Returns a message containing the shame counts of all users, in descending order
+function getWallOfShame() {
+  var shameArray = [];
+  var msg = "";
+
+  if (shameStats.size <= 0) {
+    return "Currently no one on Wall of Shame"
+  }
+
+
+  for (var x = 1; x < shameStats.size; x++) {
+    if (shameStats.values[x][0].toString().match(/^[0-9]+$/) != null) {
+      shameArray.push({name: shameStats.values[x][1], shame: shameStats.values[x][2]);
+    }
+  }
+
+  // sort array
+  shameArray.sort( (a,b) => b.shame - a.shame );
+
+  msg += "WALL OF SHAME\n\nName: Shame Count\n";
+  shameArray.forEach(element => {
+    msg += element.name + ": " + element.shame + "\n";
+  });
+
+  return msg;
+}
+
+// Incrememnts the shame count for the user given by user_id
+// returns new shame count of user
+function setShame(user_id) {
+  var found = false;
+  var x;
+  // TODO: probably a better way to check this
+  for (x = 0; x < shameStats.size; x++) {
+    if((shameStats.values[x][0] == user_id)) {
+      found = true;
+      break;
+    }
+  }
+  // if shamee is not yet on sheet, add them to it, with a single shame
+  if (!found) {
+    shameStats.sheet.appendRow(user_id, "name placeholder", 1);
+    return "User has been shamed. Total shame count: " + 1 + "\n";
+  // increment shame count otherwise
+  } else {
+    var shameCount = shameStats.values[x][2] + 1;
+    var cell = shameStats.sheet.getRange(x + 1, 3);
+    cell.setValue(shameCount);
+
+    return "User has been shamed. Total shame count: " + count + "\n";
+  }
+}
+
 function getData(){
   this.sheet = spreadsheet.getSheetByName("Data");
   this.range = this.sheet.getRange(1, 1, this.sheet.getMaxRows(), 3);
@@ -412,7 +484,15 @@ function getMessageStats() {
   this.range = this.sheet.getRange(1, 1, this.sheet.getMaxRows(), 6);
   this.values = this.range.getValues();
   this.size = this.sheet.getLastRow();
-  
+}
+
+
+// Shame sheet has three columns, with headers: shamee id, name, and shame count, in that order
+function getShameStats() {
+  this.sheet = spreadsheet.getSheetByName("Shame");
+  this.range = this.sheet.getRange(2, 1, this.sheet.getMaxRows(), 3);
+  this.values = this.range.getValues();
+  this.size = this.sheet.getLastRow();
 }
 
 
